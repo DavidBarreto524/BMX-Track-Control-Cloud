@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1">Generar reporte PDF</h2>
+    <p class="text-muted small mb-0">Selecciona las fotos, edita los comentarios y descarga el reporte.</p>
+  </div>
+  <a href="/" class="btn btn-outline-secondary btn-sm">&larr; Volver al plano</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label" for="report-title">Título del reporte</label>
+        <input id="report-title" class="form-control" value="Reporte de fotos — Pista BMX Carlos Ramírez" maxlength="200">
+      </div>
+      <div class="col-md-6">
+        <div class="form-check mt-md-4">
+          <input class="form-check-input" type="checkbox" id="save-notes" checked>
+          <label class="form-check-label" for="save-notes">
+            Guardar comentarios editados en la base de datos
+          </label>
+        </div>
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-select-all">Seleccionar todas</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-clear-all">Quitar selección</button>
+        <button type="button" class="btn btn-primary" id="btn-generate-pdf" disabled>
+          Generar PDF (<span id="selected-count">0</span>)
+        </button>
+      </div>
+    </div>
+    <div id="report-message" class="small mt-2"></div>
+  </div>
+</div>
+
+{% if photos %}
+  <div class="row g-3" id="report-photo-list">
+    {% for photo in photos %}
+      <div class="col-12 col-md-6 col-xl-4">
+        <article class="report-photo-item card shadow-sm h-100" data-photo-id="{{ photo.id }}">
+          <div class="card-body">
+            <div class="form-check mb-2">
+              <input
+                class="form-check-input report-photo-check"
+                type="checkbox"
+                value="{{ photo.id }}"
+                id="photo-check-{{ photo.id }}"
+              >
+              <label class="form-check-label fw-semibold" for="photo-check-{{ photo.id }}">
+                {% if photo.area and photo.area.code %}
+                  Área {{ photo.area.code }} — {{ photo.area.name }}
+                {% elif photo.area %}
+                  {{ photo.area.name }}
+                {% else %}
+                  Foto #{{ photo.id }}
+                {% endif %}
+              </label>
+            </div>
+            <div class="small text-muted mb-2">{{ photo.uploaded_at|format_datetime }}</div>
+            <a href="{{ photo.image_url }}" target="_blank" rel="noopener" class="d-block mb-2">
+              <img src="{{ photo.image_url }}" alt="Foto {{ photo.id }}" class="report-photo-thumb" loading="lazy">
+            </a>
+            <label class="form-label small mb-1" for="photo-notes-{{ photo.id }}">Comentario</label>
+            <textarea
+              id="photo-notes-{{ photo.id }}"
+              class="form-control form-control-sm report-photo-notes"
+              rows="3"
+              placeholder="Comentario para el reporte..."
+            >{{ photo.notes or '' }}</textarea>
+          </div>
+        </article>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card shadow-sm">
+    <div class="card-body text-center text-muted py-5">
+      No hay fotos disponibles para incluir en el reporte.
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/report-builder.js"></script>
+{% endblock %}

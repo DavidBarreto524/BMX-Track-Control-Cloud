@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ app_name }}</title>
+    <link rel="icon" type="image/png" href="/static/images/logo-licibog.png">
+    <link rel="apple-touch-icon" href="/static/images/logo-licibog.png">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    >
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body class="bg-light">
+    <div class="container app-container py-3 py-md-4">
+      {% block header %}
+      <header class="app-header mb-3 mb-md-4 d-flex justify-content-between gap-2 gap-md-3 flex-wrap align-items-center">
+        <div class="app-brand">
+          <a href="/" class="app-brand-link text-decoration-none">
+            <img
+              src="/static/images/logo-licibog.png"
+              alt="Liga Ciclismo Bogotá"
+              class="app-brand-logo"
+            >
+            <div class="app-brand-text">
+              <h1 class="app-brand-title">{{ app_name }}</h1>
+              <p class="app-brand-subtitle mb-0">
+                <span class="app-brand-subtitle-long">Liga Ciclismo Bogotá · </span>Control BMX
+              </p>
+            </div>
+          </a>
+        </div>
+        {% if current_user %}
+          <div class="app-header-actions d-flex align-items-center gap-2 gap-md-3 ms-auto">
+            {% if has_permission(current_user.role, 'generate_reports') %}
+              <a href="/reportes" class="btn btn-outline-secondary btn-sm app-header-report-btn">Reporte PDF</a>
+            {% endif %}
+            {% if has_permission(current_user.role, 'view_alerts') %}
+              <div class="dropdown notification-bell">
+                <button
+                  class="btn btn-outline-secondary btn-sm notification-bell-btn dropdown-toggle"
+                  type="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  aria-label="Notificaciones{% if open_alerts %} ({{ open_alerts|length }} pendientes){% endif %}"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.12a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6v1a1 1 0 0 1-1 1v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1a1 1 0 0 1-1-1V6a5 5 0 0 0-5-5"/>
+                  </svg>
+                  {% if open_alerts %}
+                    <span class="notification-badge">{{ open_alerts|length }}</span>
+                  {% endif %}
+                </button>
+                <div class="dropdown-menu dropdown-menu-end notification-dropdown shadow">
+                  <div class="notification-dropdown-header">
+                    <div class="notification-dropdown-title">
+                      <span>Alertas abiertas</span>
+                      {% if open_alerts %}
+                        <span class="badge rounded-pill text-bg-danger">{{ open_alerts|length }}</span>
+                      {% endif %}
+                    </div>
+                    <p class="notification-dropdown-subtitle mb-0">Áreas sin foto dentro del intervalo esperado</p>
+                  </div>
+                  {% if open_alerts %}
+                    <div class="notification-list">
+                      {% for alert in open_alerts %}
+                        <div class="notification-item">
+                          {% if alert.area and alert.area.code %}
+                            <a href="/areas/{{ alert.area.code }}" class="notification-item-link">
+                              <span class="notification-area-badge" aria-hidden="true">{{ alert.area.code }}</span>
+                              <span class="notification-item-content">
+                                <span class="notification-title">
+                                  {% if alert.area.name %}{{ alert.area.name }}{% else %}Área {{ alert.area.code }}{% endif %}
+                                </span>
+                                <span class="notification-message">Foto pendiente en el intervalo esperado</span>
+                                <span class="notification-time">{{ alert.created_at|format_datetime }}</span>
+                              </span>
+                              <span class="notification-chevron" aria-hidden="true">›</span>
+                            </a>
+                          {% else %}
+                            <div class="notification-item-static">
+                              <span class="notification-item-content">
+                                <span class="notification-title">Alerta de carga</span>
+                                <span class="notification-message">{{ alert.message }}</span>
+                                <span class="notification-time">{{ alert.created_at|format_datetime }}</span>
+                              </span>
+                            </div>
+                          {% endif %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="notification-empty">
+                      <span class="notification-empty-icon" aria-hidden="true">✓</span>
+                      <span>Todo al día. No hay alertas pendientes.</span>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+            <div class="app-user-panel text-end">
+              <div class="small text-muted app-user-label">Sesión activa</div>
+              <div class="fw-semibold app-user-name">
+                {{ current_user.username }}
+                <span class="badge text-bg-dark text-uppercase">{{ current_user.role }}</span>
+              </div>
+              <form method="post" action="/logout" class="mt-1 mt-md-2">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Salir</button>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+      </header>
+      {% endblock %}
+      {% block content %}{% endblock %}
+    </div>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

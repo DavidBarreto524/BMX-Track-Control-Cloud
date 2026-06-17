@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card shadow-sm track-map-card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+          <div>
+            <h2 class="h5 mb-1">Plano de la cancha</h2>
+            <p class="text-muted small mb-0">Pasa el cursor sobre una letra y haz clic para ver sus fotos.</p>
+          </div>
+          <div class="track-legend small">
+            <span class="legend-item"><span class="legend-dot zone-ok"></span> Al día</span>
+            <span class="legend-item"><span class="legend-dot zone-late"></span> Atrasada</span>
+            <span class="legend-item"><span class="legend-dot zone-empty"></span> Sin fotos</span>
+          </div>
+        </div>
+
+        <div class="track-map">
+          <div class="track-photo-map">
+            <img
+              src="{{ track_map_image }}"
+              alt="Pista de BMX Carlos Ramírez"
+              class="track-photo-map-image"
+            >
+            {% for hotspot in track_hotspots %}
+              {% if hotspot.area %}
+                <a
+                  href="/areas/{{ hotspot.area_code }}"
+                  class="track-hotspot {{ hotspot.status_class }}"
+                  style="top: {{ hotspot.top }}%; left: {{ hotspot.left }}%; width: {{ hotspot.width }}%; height: {{ hotspot.height }}%;"
+                  title="{{ hotspot.label }} → {{ hotspot.area.name }} — {{ hotspot.area.upload_status }}"
+                  aria-label="Ver fotos del área {{ hotspot.area_code }} ({{ hotspot.label }})"
+                ></a>
+              {% else %}
+                <span
+                  class="track-hotspot zone-missing"
+                  style="top: {{ hotspot.top }}%; left: {{ hotspot.left }}%; width: {{ hotspot.width }}%; height: {{ hotspot.height }}%;"
+                  title="{{ hotspot.label }} → área {{ hotspot.area_code }} no registrada"
+                ></span>
+              {% endif %}
+            {% endfor %}
+          </div>
+          <p class="text-center text-muted small mt-2 mb-0">Pista de BMX Carlos Ramírez</p>
+          {% if has_permission(current_user.role, 'calibrate_map') %}
+            <p class="text-center small mt-2 mb-0">
+              <a href="/admin/mapa-calibracion">Calibrar posiciones del mapa (A1, A2, L1…)</a>
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5">Resumen por marcador</h2>
+        <p class="text-muted small">Cada tarjeta corresponde a un punto del plano (A1, A2, B1, L1…).</p>
+        {% if track_hotspots %}
+          <div class="row g-2">
+            {% for hotspot in track_hotspots %}
+              <div class="col-6 col-md-4 col-xl-3">
+                {% if hotspot.area %}
+                  <a href="/areas/{{ hotspot.area_code }}" class="area-summary-card text-decoration-none">
+                {% else %}
+                  <div class="area-summary-card area-summary-card-static">
+                {% endif %}
+                  <div class="area-summary-letter">{{ hotspot.label }}</div>
+                  <div class="area-summary-name">
+                    {% if hotspot.area %}{{ hotspot.area.name }}{% else %}Área {{ hotspot.area_code }}{% endif %}
+                  </div>
+                  {% if hotspot.description %}
+                    <p class="small text-muted mb-2">{{ hotspot.description }}</p>
+                  {% endif %}
+                  {% if hotspot.area %}
+                    <span class="badge {% if hotspot.area.upload_status == 'Al día' %}text-bg-success{% elif hotspot.area.upload_status == 'Atrasada' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+                      {{ hotspot.area.upload_status }}
+                    </span>
+                  {% else %}
+                    <span class="badge text-bg-light text-dark">Sin área registrada</span>
+                  {% endif %}
+                {% if hotspot.area %}
+                  </a>
+                {% else %}
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mb-0">Aún no hay marcadores configurados en el mapa.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if has_permission(current_user.role, 'manage_areas') %}
+  <div class="col-12 col-lg-6 col-xl-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5">Registrar área</h2>
+        <form method="post" action="/areas" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Letra / código</label>
+            <input name="code" class="form-control" maxlength="10" placeholder="Ej: A">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Nombre del área</label>
+            <input name="name" class="form-control" required minlength="2" maxlength="150">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descripción</label>
+            <textarea name="description" class="form-control" rows="2"></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Intervalo esperado (minutos)</label>
+            <input
+              name="expected_upload_interval_minutes"
+              type="number"
+              min="5"
+              max="1440"
+              value="{{ default_interval }}"
+              class="form-control"
+            >
+          </div>
+          <div class="col-12 d-grid">
+            <button class="btn btn-primary">Guardar área</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-3">
+  <a href="/" class="btn btn-outline-secondary btn-sm">&larr; Volver al plano</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
+          <div>
+            <div class="area-detail-badge">{{ area.code or "?" }}</div>
+            <h2 class="h4 mb-1">{{ area.name }}</h2>
+            <p class="text-muted mb-0">{{ area.description or "Sin descripción" }}</p>
+          </div>
+          <span class="badge {% if area.upload_status == 'Al día' %}text-bg-success{% elif area.upload_status == 'Atrasada' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">
+            {{ area.upload_status }}
+          </span>
+        </div>
+        <p class="small mb-1"><strong>Intervalo:</strong> {{ area.expected_upload_interval_minutes }} min</p>
+        <p class="small mb-0"><strong>Última foto:</strong> {{ area.last_uploaded_at or "Sin registros" }}</p>
+
+        {% if has_permission(current_user.role, 'upload_photos') %}
+        <hr>
+        <h3 class="h6">Subir nueva foto</h3>
+        <form method="post" enctype="multipart/form-data" action="/areas/{{ area.id }}/upload" class="row g-2">
+          <div class="col-12">
+            <input type="file" name="file" class="form-control" accept="image/*" required>
+          </div>
+          <div class="col-12">
+            <input name="notes" class="form-control" placeholder="Nota opcional">
+          </div>
+          <div class="col-12 d-grid">
+            <button class="btn btn-primary">Subir foto</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Fotos del área {{ area.code or area.name }}</h2>
+        {% if photos %}
+          <div class="photo-gallery">
+            {% for photo in photos %}
+              <article class="photo-card">
+                <a href="{{ photo.image_url }}" target="_blank" rel="noopener">
+                  <img src="{{ photo.image_url }}" alt="Foto área {{ area.code }}" loading="lazy">
+                </a>
+                <div class="photo-card-body">
+                  <div class="small text-muted">{{ photo.uploaded_at }}</div>
+                  {% if photo.notes %}
+                    <p class="small mb-2">{{ photo.notes }}</p>
+                  {% endif %}
+                  {% if has_permission(current_user.role, 'delete_photos') %}
+                    <form
+                      method="post"
+                      action="/areas/{{ area.code }}/photos/{{ photo.id }}/delete"
+                      onsubmit="return confirm('¿Eliminar esta foto? Esta acción no se puede deshacer.');"
+                    >
+                      <button type="submit" class="btn btn-outline-danger btn-sm">Eliminar</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <p class="mb-0">Esta área aún no tiene fotos.</p>
+            {% if has_permission(current_user.role, 'upload_photos') %}
+              <p class="small">Usa el formulario de la izquierda para subir la primera.</p>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

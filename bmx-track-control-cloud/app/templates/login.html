@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block header %}
+<header class="login-header text-center mb-4">
+  <img
+    src="/static/images/logo-licibog.png"
+    alt="LICIBOG - Liga Ciclismo Bogotá"
+    class="login-logo"
+  >
+  <h1 class="login-app-title">{{ app_name }}</h1>
+  <p class="login-app-subtitle mb-0">Liga Ciclismo Bogotá</p>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5 col-lg-4">
+    <div class="card shadow-sm login-card">
+      <div class="card-body">
+        <h2 class="h5 mb-3 text-center">Iniciar sesión</h2>
+        {% if error %}
+          <div class="alert alert-danger py-2" role="alert">{{ error }}</div>
+        {% endif %}
+        <form method="post" action="/login" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Usuario</label>
+            <input name="username" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Contraseña</label>
+            <input name="password" type="password" class="form-control" required>
+          </div>
+          <div class="col-12 d-grid">
+            <button class="btn btn-primary">Entrar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <a href="/" class="btn btn-outline-secondary btn-sm">&larr; Volver al plano</a>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-restore-hotspots">Restaurar por defecto</button>
+    <button type="button" class="btn btn-outline-primary btn-sm" id="btn-add-hotspot">+ Agregar marcador</button>
+    <button type="button" class="btn btn-primary btn-sm" id="btn-save-hotspots">Guardar calibración</button>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-1">Calibrar plano de la cancha</h2>
+        <p class="text-muted small mb-3">
+          Arrastra cada marcador hasta su letra en la foto. Usa etiquetas como A1, A2, B1, L1…
+          El campo <strong>Área</strong> indica a qué zona van las fotos (A, B, L…).
+        </p>
+        <div class="track-photo-map map-calibration-stage" id="calibration-map">
+          <img
+            src="{{ track_map_image }}"
+            alt="Pista de BMX Carlos Ramírez"
+            class="track-photo-map-image"
+            id="calibration-image"
+          >
+          <div id="calibration-markers"></div>
+        </div>
+        <div id="save-message" class="small mt-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 mb-3">Marcadores del mapa</h2>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0" id="hotspots-table">
+            <thead>
+              <tr>
+                <th>Etiqueta</th>
+                <th>Área</th>
+                <th>Top%</th>
+                <th>Left%</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="hotspots-table-body"></tbody>
+          </table>
+        </div>
+        <p class="text-muted small mt-3 mb-0">
+          Ejemplo: dos puntos en gradería → B1 y B2, ambos con área <code>B</code>.
+          Tres curvas → L1, L2, L3 con área <code>L</code>.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script id="hotspots-data" type="application/json">{{ hotspots_json | safe }}</script>
+<script src="/static/js/map-calibration.js"></script>
+{% endblock %}
