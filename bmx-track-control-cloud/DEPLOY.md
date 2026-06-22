@@ -103,6 +103,7 @@ Copia el resultado; será tu `SESSION_SECRET_KEY`.
 
 | Campo | Valor |
 |-------|-------|
+| **Root Directory** | `bmx-track-control-cloud` ← **obligatorio** |
 | **Name** | `bmx-track-control` |
 | **Region** | Oregon (US West) o la más cercana |
 | **Branch** | `main` |
@@ -178,6 +179,11 @@ Con esto la app no se duerme y el scheduler de alertas sigue funcionando.
 ---
 
 ## Solución de problemas
+
+### `failed to read dockerfile: open Dockerfile: no such file or directory`
+- El repo tiene la app en la subcarpeta `bmx-track-control-cloud/`.
+- En Render → **Settings** → **Root Directory** → escribe: `bmx-track-control-cloud`
+- Guarda y haz **Manual Deploy**.
 
 ### Error al conectar a la base de datos
 - Verifica que `DATABASE_URL` en Render sea la de Neon (con `?sslmode=require`).

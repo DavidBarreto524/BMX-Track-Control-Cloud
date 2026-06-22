@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: bmx-track-control-cloud
+    runtime: docker
+    rootDir: bmx-track-control-cloud
+    plan: free
+    healthCheckPath: /health
