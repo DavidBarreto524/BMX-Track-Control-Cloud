@@ -181,9 +181,9 @@ Con esto la app no se duerme y el scheduler de alertas sigue funcionando.
 ## Solución de problemas
 
 ### `failed to read dockerfile: open Dockerfile: no such file or directory`
-- El repo tiene la app en la subcarpeta `bmx-track-control-cloud/`.
-- En Render → **Settings** → **Root Directory** → escribe: `bmx-track-control-cloud`
-- Guarda y haz **Manual Deploy**.
+- Opción 1: En Render → **Settings** → **Root Directory** → `bmx-track-control-cloud` → Save → **Manual Deploy**.
+- Opción 2: El repo también incluye un `Dockerfile` en la raíz (sin Root Directory).
+- Asegúrate de desplegar el **último commit** (no uno antiguo como `9568f39`).
 
 ### Error al conectar a la base de datos
 - Verifica que `DATABASE_URL` en Render sea la de Neon (con `?sslmode=require`).
