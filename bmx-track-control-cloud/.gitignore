@@ -6,4 +6,6 @@ __pycache__/
 *.db
 app/uploads/*
 !app/uploads/.gitkeep
-
+tests/uploads/*.jpg
+Untitled
+Untitled*

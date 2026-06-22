@@ -42,16 +42,16 @@ Aplicaci?n para gestionar ?reas de trabajo de una cancha BMX con carga de fotos 
 - `GET /api/areas/{area_id}/photos` historial de fotos.
 - `GET /api/alerts` listar alertas (abiertas o todas).
 
-## Despliegue en nube (Render/Railway/Fly.io)
+## Despliegue gratis en la nube
+
+Gu?a completa paso a paso: **[DEPLOY.md](DEPLOY.md)** (Render + Neon + Cloudinary, $0).
+
+Resumen r?pido:
 1. Sube el proyecto a GitHub.
-2. Crea un servicio web con Docker.
-3. Define variables de entorno:
-   - `DATABASE_URL` (PostgreSQL recomendado en producci?n).
-   - `ENABLE_SCHEDULER=true`
-   - Variables `CLOUDINARY_*` si usar?s almacenamiento de im?genes en nube.
-4. Exp?n puerto `8000`.
-5. Comando de inicio (si lo piden):
-   `uvicorn app.main:app --host 0.0.0.0 --port 8000`
+2. Crea PostgreSQL en [Neon](https://neon.tech).
+3. Crea cuenta en [Cloudinary](https://cloudinary.com) para las fotos.
+4. Despliega en [Render](https://render.com) con Docker (puerto 8000).
+5. Configura [cron-job.org](https://cron-job.org) para ping a `/health` cada 10 min.
 
 ## Nota de producci?n
 Para producci?n, usa PostgreSQL administrado y Cloudinary para no depender del disco local de la instancia.

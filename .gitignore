@@ -1,0 +1,16 @@
+# Entorno Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secretos y datos locales
+.env
+*.db
+
+# Artefactos de pruebas
+tests/uploads/*.jpg
+
+# Archivos sueltos del editor
+Untitled
+Untitled*
