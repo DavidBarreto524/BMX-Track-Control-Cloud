@@ -30,6 +30,7 @@ class PhotoRead(BaseModel):
     area_id: int
     image_url: str
     notes: str | None
+    hotspot_label: str | None = None
     uploaded_at: datetime
 
 

@@ -19,15 +19,48 @@ DEFAULT_MAP_HOTSPOTS: list[dict[str, float | str | None]] = [
     {"label": "F", "area_code": "F", "top": 48.5, "left": 76.7, "description": "Llamado de mangas"},
     {"label": "I", "area_code": "I", "top": 59.2, "left": 75.3, "description": "Ingreso a pista"},
     {"label": "E", "area_code": "E", "top": 60.5, "left": 88.5, "description": "Entrada / salida mangas"},
-    {"label": "L1", "area_code": "L", "top": 50.9, "left": 11.8, "description": "Curva izquierda superior"},
-    {"label": "L2", "area_code": "L", "top": 85.8, "left": 14.9, "description": "Curva inferior izquierda"},
-    {"label": "L3", "area_code": "L", "top": 68.5, "left": 69.9, "description": "Curva derecha central"},
+    {"label": "Peralte 1", "area_code": "L", "top": 50.9, "left": 11.8, "description": "Curva izquierda superior"},
+    {"label": "Peralte 2", "area_code": "L", "top": 85.8, "left": 14.9, "description": "Curva inferior izquierda"},
+    {"label": "Peralte 3", "area_code": "L", "top": 68.5, "left": 69.9, "description": "Curva derecha central"},
     {"label": "K", "area_code": "K", "top": 95.0, "left": 53.0, "description": "Recta de llegada / patinador"},
     {"label": "J", "area_code": "J", "top": 84.9, "left": 78.0, "description": "Ingreso zona llegada"},
 ]
 
 DEFAULT_HOTSPOT_WIDTH = 2.5
 DEFAULT_HOTSPOT_HEIGHT = 4.9
+
+LEGACY_L_HOTSPOT_RENAMES = {
+    "L1": "Peralte 1",
+    "L2": "Peralte 2",
+    "L3": "Peralte 3",
+}
+
+
+def migrate_legacy_l_hotspot_labels(db: Session) -> None:
+    from app.models import Photo
+
+    for old_label, new_label in LEGACY_L_HOTSPOT_RENAMES.items():
+        if db.query(MapHotspot).filter(MapHotspot.label == new_label).first():
+            for variant in (old_label, old_label.upper()):
+                legacy = db.query(MapHotspot).filter(MapHotspot.label == variant).first()
+                if legacy:
+                    db.delete(legacy)
+            db.query(Photo).filter(Photo.hotspot_label.in_([old_label, old_label.upper()])).update(
+                {Photo.hotspot_label: new_label},
+                synchronize_session=False,
+            )
+            continue
+
+        for variant in (old_label, old_label.upper()):
+            hotspot = db.query(MapHotspot).filter(MapHotspot.label == variant).first()
+            if hotspot:
+                hotspot.label = new_label
+            db.query(Photo).filter(Photo.hotspot_label == variant).update(
+                {Photo.hotspot_label: new_label},
+                synchronize_session=False,
+            )
+
+    db.commit()
 
 
 def reset_map_hotspots_to_defaults(db: Session) -> None:
@@ -115,7 +148,7 @@ def replace_map_hotspots(db: Session, payload: list[dict]) -> None:
     for index, item in enumerate(payload):
         db.add(
             MapHotspot(
-                label=str(item["label"]).strip().upper(),
+                label=str(item["label"]).strip(),
                 area_code=str(item["area_code"]).strip().upper(),
                 top=float(item["top"]),
                 left=float(item["left"]),

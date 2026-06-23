@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
+{% if reset_message %}
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    {{ reset_message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+  </div>
+{% endif %}
 <div class="row g-4">
   <div class="col-12">
     <div class="card shadow-sm track-map-card">
@@ -14,6 +20,18 @@
             <span class="legend-item"><span class="legend-dot zone-late"></span> Atrasada</span>
             <span class="legend-item"><span class="legend-dot zone-empty"></span> Sin fotos</span>
           </div>
+          {% if can_delete_photos(current_user.username) and total_photos > 0 %}
+            <form
+              method="post"
+              action="/admin/fotos/reiniciar"
+              class="m-0"
+              onsubmit="return confirm('¿Eliminar TODAS las fotos ({{ total_photos }}) de todas las áreas?\n\nEsta acción no se puede deshacer. Las áreas quedarán listas para volver a tomar fotos desde cero.');"
+            >
+              <button type="submit" class="btn btn-outline-danger btn-sm">
+                Reiniciar todas las fotos
+              </button>
+            </form>
+          {% endif %}
         </div>
 
         <div class="track-map">
@@ -26,7 +44,7 @@
             {% for hotspot in track_hotspots %}
               {% if hotspot.area %}
                 <a
-                  href="/areas/{{ hotspot.area_code }}"
+                  href="/areas/{{ hotspot.area_code }}?punto={{ hotspot.label | urlencode }}"
                   class="track-hotspot {{ hotspot.status_class }}"
                   style="top: {{ hotspot.top }}%; left: {{ hotspot.left }}%; width: {{ hotspot.width }}%; height: {{ hotspot.height }}%;"
                   title="{{ hotspot.label }} → {{ hotspot.area.name }} — {{ hotspot.area.upload_status }}"
@@ -62,7 +80,7 @@
             {% for hotspot in track_hotspots %}
               <div class="col-6 col-md-4 col-xl-3">
                 {% if hotspot.area %}
-                  <a href="/areas/{{ hotspot.area_code }}" class="area-summary-card text-decoration-none">
+                  <a href="/areas/{{ hotspot.area_code }}?punto={{ hotspot.label | urlencode }}" class="area-summary-card text-decoration-none">
                 {% else %}
                   <div class="area-summary-card area-summary-card-static">
                 {% endif %}

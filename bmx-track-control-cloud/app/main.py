@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import quote
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
@@ -16,7 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import Base, SessionLocal, engine, get_db
-from app.dependencies.auth import ApiAuth, LoginRedirect, WebAuth, get_optional_user
+from app.dependencies.auth import ApiAuth, ApiAuthDeletePhotos, LoginRedirect, WebAuth, WebAuthDeletePhotos, get_optional_user
 from app.models import Alert, Area, Photo, User
 from app.schemas import (
     AlertRead,
@@ -29,14 +30,24 @@ from app.schemas import (
 )
 from app.services.alerts import evaluate_upload_alerts, resolve_open_alerts_for_area
 from app.services.areas import ensure_area_code_column, ensure_track_areas
-from app.services.security import has_permission
+from app.services.photo_locations import (
+    ensure_photo_hotspot_column,
+    hotspot_lookup_by_label,
+    hotspots_for_area_code,
+    photo_location_display,
+    photo_report_label,
+    resolve_hotspot_for_area,
+)
+from app.services.security import can_delete_photos, has_permission
 from app.services.storage import delete_stored_photo, store_photo
 from app.services.pdf_report import ReportPhotoEntry, build_photos_pdf, resolve_photo_image_path
+from app.services.photos import delete_all_photos
 from app.services.map_hotspots import (
     TRACK_MAP_IMAGE,
     build_track_hotspots,
     ensure_map_hotspots,
     list_map_hotspots,
+    migrate_legacy_l_hotspot_labels,
     replace_map_hotspots,
     reset_map_hotspots_to_defaults,
 )
@@ -48,6 +59,7 @@ from app.services.timezone import utc_now
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["has_permission"] = has_permission
+templates.env.globals["can_delete_photos"] = can_delete_photos
 
 
 def _format_datetime(value: datetime | None) -> str:
@@ -142,11 +154,13 @@ def _page_context(
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     ensure_area_code_column(engine)
+    ensure_photo_hotspot_column(engine)
 
     db = SessionLocal()
     try:
         ensure_bootstrap_users(db)
         ensure_track_areas(db)
+        migrate_legacy_l_hotspot_labels(db)
         ensure_map_hotspots(db)
     finally:
         db.close()
@@ -221,6 +235,11 @@ def logout(request: Request, _: User = WebAuth("access_dashboard")):
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db), current_user: User = WebAuth("access_dashboard")):
+    reiniciado = request.query_params.get("reiniciado")
+    reset_message = None
+    if reiniciado is not None and reiniciado.isdigit():
+        reset_message = f"Se eliminaron {reiniciado} foto(s). Puedes volver a tomarlas desde el plano."
+
     areas_with_last_upload = (
         db.query(Area, func.max(Photo.uploaded_at).label("last_uploaded_at"))
         .outerjoin(Photo, Photo.area_id == Area.id)
@@ -237,6 +256,7 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
             areas_by_code[area.code.upper()] = area_info
 
     track_hotspots = build_track_hotspots(db, areas_by_code)
+    total_photos = db.query(func.count(Photo.id)).scalar() or 0
 
     return templates.TemplateResponse(
         "index.html",
@@ -248,6 +268,8 @@ def dashboard(request: Request, db: Session = Depends(get_db), current_user: Use
             track_hotspots=track_hotspots,
             track_map_image=TRACK_MAP_IMAGE,
             default_interval=settings.default_photo_interval_minutes,
+            total_photos=total_photos,
+            reset_message=reset_message,
         ),
     )
 
@@ -277,6 +299,32 @@ def area_detail(
     )
 
     area_info = _area_dict(area, last_uploaded_at)
+    area_hotspots = hotspots_for_area_code(db, normalized_code)
+    punto = request.query_params.get("punto", "").strip().upper()
+    selected_hotspot = None
+    if punto:
+        selected_hotspot = next(
+            (hotspot for hotspot in area_hotspots if hotspot.label.upper() == punto),
+            None,
+        )
+    elif len(area_hotspots) == 1:
+        selected_hotspot = area_hotspots[0]
+
+    if selected_hotspot and len(area_hotspots) > 1:
+        photos = [
+            photo
+            for photo in photos
+            if (photo.hotspot_label or "").upper() == selected_hotspot.label.upper()
+        ]
+
+    hotspots_by_label = hotspot_lookup_by_label(db)
+    photo_items = [
+        {
+            "photo": photo,
+            "location_display": photo_location_display(photo, hotspots_by_label),
+        }
+        for photo in photos
+    ]
 
     return templates.TemplateResponse(
         "area_detail.html",
@@ -286,6 +334,10 @@ def area_detail(
             current_user,
             area=area_info,
             photos=photos,
+            photo_items=photo_items,
+            area_hotspots=area_hotspots,
+            selected_hotspot=selected_hotspot,
+            hotspot_lookup=hotspots_by_label,
         ),
     )
 
@@ -329,9 +381,9 @@ def save_map_calibration(
     db: Session = Depends(get_db),
     _: User = ApiAuth("calibrate_map"),
 ):
-    labels = [item.label.strip().upper() for item in payload.hotspots]
+    labels = [item.label.strip().lower() for item in payload.hotspots]
     if len(labels) != len(set(labels)):
-        raise HTTPException(status_code=400, detail="Cada etiqueta debe ser única (A1, A2, L1…).")
+        raise HTTPException(status_code=400, detail="Cada etiqueta debe ser única (A1, A2, Peralte 1…).")
 
     replace_map_hotspots(db, [item.model_dump() for item in payload.hotspots])
     saved = list_map_hotspots(db)
@@ -419,7 +471,7 @@ def delete_photo_from_form(
     area_code: str,
     photo_id: int,
     db: Session = Depends(get_db),
-    _: User = WebAuth("delete_photos"),
+    _: User = WebAuthDeletePhotos(),
 ):
     normalized_code = area_code.strip().upper()
     area = db.query(Area).filter(Area.code == normalized_code).first()
@@ -433,11 +485,24 @@ def delete_photo_from_form(
     return RedirectResponse(url=f"/areas/{normalized_code}", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@app.post("/admin/fotos/reiniciar")
+def reset_all_photos(
+    db: Session = Depends(get_db),
+    _: User = WebAuthDeletePhotos(),
+):
+    deleted_count = delete_all_photos(db)
+    return RedirectResponse(
+        url=f"/?reiniciado={deleted_count}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 @app.post("/areas/{area_id}/upload")
 async def upload_photo_from_form(
     area_id: int,
     file: UploadFile = File(...),
     notes: Annotated[str | None, Form()] = None,
+    hotspot_label: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
     _: User = WebAuth("upload_photos"),
 ):
@@ -446,17 +511,31 @@ async def upload_photo_from_form(
         raise HTTPException(status_code=404, detail="Área no encontrada.")
 
     try:
+        resolved_hotspot = resolve_hotspot_for_area(db, area, hotspot_label)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
         image_url = await store_photo(file)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="No se pudo subir la imagen.") from exc
 
-    db.add(Photo(area_id=area_id, image_url=image_url, notes=notes))
+    db.add(
+        Photo(
+            area_id=area_id,
+            image_url=image_url,
+            notes=notes,
+            hotspot_label=resolved_hotspot,
+        )
+    )
     resolve_open_alerts_for_area(db, area_id)
     db.commit()
 
     redirect_url = f"/areas/{area.code}" if area.code else "/"
+    if resolved_hotspot:
+        redirect_url = f"{redirect_url}?punto={quote(resolved_hotspot)}"
     return RedirectResponse(redirect_url, status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -504,6 +583,7 @@ async def upload_photo_api(
     area_id: int,
     file: UploadFile = File(...),
     notes: Annotated[str | None, Form()] = None,
+    hotspot_label: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
     _: User = ApiAuth("upload_photos"),
 ):
@@ -512,13 +592,23 @@ async def upload_photo_api(
         raise HTTPException(status_code=404, detail="Área no encontrada.")
 
     try:
+        resolved_hotspot = resolve_hotspot_for_area(db, area, hotspot_label)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
         image_url = await store_photo(file)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="No se pudo subir la imagen.") from exc
 
-    photo = Photo(area_id=area_id, image_url=image_url, notes=notes)
+    photo = Photo(
+        area_id=area_id,
+        image_url=image_url,
+        notes=notes,
+        hotspot_label=resolved_hotspot,
+    )
     db.add(photo)
     resolve_open_alerts_for_area(db, area_id)
     db.commit()
@@ -549,7 +639,7 @@ def delete_photo_api(
     area_id: int,
     photo_id: int,
     db: Session = Depends(get_db),
-    _: User = ApiAuth("delete_photos"),
+    _: User = ApiAuthDeletePhotos(),
 ):
     area = db.query(Area).filter(Area.id == area_id).first()
     if not area:
@@ -587,7 +677,13 @@ def report_builder_page(
     )
     return templates.TemplateResponse(
         "report_builder.html",
-        _page_context(request, db, current_user, photos=photos),
+        _page_context(
+            request,
+            db,
+            current_user,
+            photos=photos,
+            hotspot_lookup=hotspot_lookup_by_label(db),
+        ),
     )
 
 
@@ -618,6 +714,7 @@ def generate_report_pdf(
 
     entries: list[ReportPhotoEntry] = []
     temp_files: list[Path] = []
+    hotspots_by_label = hotspot_lookup_by_label(db)
     try:
         for item in payload.photos:
             photo = photos_by_id[item.photo_id]
@@ -632,13 +729,7 @@ def generate_report_pdf(
             if not photo.image_url.startswith("/uploads/"):
                 temp_files.append(image_path)
 
-            area = photo.area
-            if area and area.code:
-                area_label = f"Área {area.code} — {area.name}"
-            elif area:
-                area_label = area.name
-            else:
-                area_label = f"Área #{photo.area_id}"
+            area_label = photo_report_label(photo, photo.area, hotspots_by_label)
 
             entries.append(
                 ReportPhotoEntry(
@@ -649,7 +740,8 @@ def generate_report_pdf(
                 )
             )
 
-        pdf_bytes = build_photos_pdf(payload.title.strip(), entries, current_user.username)
+        pdf_bytes, prepared_images = build_photos_pdf(payload.title.strip(), entries, current_user.username)
+        temp_files.extend(prepared_images)
     finally:
         for path in temp_files:
             path.unlink(missing_ok=True)

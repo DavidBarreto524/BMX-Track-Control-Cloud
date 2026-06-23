@@ -18,7 +18,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services.areas import ensure_area_code_column, ensure_track_areas  # noqa: E402
-from app.services.map_hotspots import ensure_map_hotspots  # noqa: E402
+from app.services.map_hotspots import ensure_map_hotspots, migrate_legacy_l_hotspot_labels  # noqa: E402
+from app.services.photo_locations import ensure_photo_hotspot_column  # noqa: E402
 from app.services.users import ensure_bootstrap_users  # noqa: E402
 
 
@@ -27,10 +28,12 @@ def clean_database():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     ensure_area_code_column(engine)
+    ensure_photo_hotspot_column(engine)
     db = SessionLocal()
     try:
         ensure_bootstrap_users(db)
         ensure_track_areas(db)
+        migrate_legacy_l_hotspot_labels(db)
         ensure_map_hotspots(db)
     finally:
         db.close()
@@ -173,6 +176,70 @@ def test_delete_photo_as_supervisor(auth_client, client):
     assert delete_resp.status_code == 204
 
 
+def test_delete_all_photos(auth_client):
+    area = auth_client.post(
+        "/api/areas",
+        json={"name": "Zona reinicio", "code": "Z", "expected_upload_interval_minutes": 30},
+    ).json()
+    auth_client.post(
+        f"/api/areas/{area['id']}/photos",
+        files={"file": ("foto.jpg", b"fake-image", "image/jpeg")},
+    )
+    auth_client.post(
+        f"/api/areas/{area['id']}/photos",
+        files={"file": ("foto2.jpg", b"fake-image-2", "image/jpeg")},
+    )
+
+    reset_resp = auth_client.post("/admin/fotos/reiniciar", follow_redirects=False)
+    assert reset_resp.status_code == 303
+    assert reset_resp.headers["location"] == "/?reiniciado=2"
+
+    photos_resp = auth_client.get(f"/api/areas/{area['id']}/photos")
+    assert photos_resp.json() == []
+
+    dashboard = auth_client.get("/")
+    assert "Reiniciar todas las fotos" not in dashboard.text
+
+
+def test_delete_photo_forbidden_for_other_supervisor(auth_client, client):
+    db = SessionLocal()
+    try:
+        from app.models import User
+        from app.services.security import hash_password
+
+        other_supervisor = User(
+            username="supervisor_otro",
+            password_hash=hash_password("super123"),
+            role="supervisor",
+        )
+        db.add(other_supervisor)
+        db.commit()
+    finally:
+        db.close()
+
+    area = auth_client.post(
+        "/api/areas",
+        json={"name": "Zona supervisor ajeno", "expected_upload_interval_minutes": 30},
+    ).json()
+    photo = auth_client.post(
+        f"/api/areas/{area['id']}/photos",
+        files={"file": ("foto.jpg", b"fake-image", "image/jpeg")},
+    ).json()
+
+    login_resp = client.post(
+        "/login",
+        data={"username": "supervisor_otro", "password": "super123"},
+        follow_redirects=False,
+    )
+    assert login_resp.status_code == 303
+
+    delete_resp = client.delete(f"/api/areas/{area['id']}/photos/{photo['id']}")
+    assert delete_resp.status_code == 403
+
+    reset_resp = client.post("/admin/fotos/reiniciar", follow_redirects=False)
+    assert reset_resp.status_code == 403
+
+
 def test_delete_photo_forbidden_for_viewer(auth_client, client):
     db = SessionLocal()
     try:
@@ -209,9 +276,80 @@ def test_delete_photo_forbidden_for_viewer(auth_client, client):
     assert delete_resp.status_code == 403
 
 
+def test_reset_all_photos_forbidden_for_viewer(auth_client, client):
+    db = SessionLocal()
+    try:
+        from app.models import User
+        from app.services.security import hash_password
+
+        viewer = User(
+            username="viewer_reset",
+            password_hash=hash_password("viewer123"),
+            role="viewer",
+        )
+        db.add(viewer)
+        db.commit()
+    finally:
+        db.close()
+
+    auth_client.post(
+        "/api/areas",
+        json={"name": "Zona viewer reset", "expected_upload_interval_minutes": 30},
+    )
+
+    login_resp = client.post(
+        "/login",
+        data={"username": "viewer_reset", "password": "viewer123"},
+        follow_redirects=False,
+    )
+    assert login_resp.status_code == 303
+
+    reset_resp = client.post("/admin/fotos/reiniciar", follow_redirects=False)
+    assert reset_resp.status_code == 403
+
+
 def test_api_requires_authentication(client):
     response = client.get("/api/areas")
     assert response.status_code == 401
+
+
+def test_upload_photo_with_hotspot_label(auth_client):
+    areas = auth_client.get("/api/areas").json()
+    area_a = next(area for area in areas if area.get("code") == "A")
+
+    upload_a1 = auth_client.post(
+        f"/api/areas/{area_a['id']}/photos",
+        files={"file": ("foto-a1.jpg", b"fake-image-a1", "image/jpeg")},
+        data={"hotspot_label": "A1", "notes": "Foto en acceso principal"},
+    )
+    assert upload_a1.status_code == 201
+    body_a1 = upload_a1.json()
+    assert body_a1["hotspot_label"] == "A1"
+
+    upload_a2 = auth_client.post(
+        f"/api/areas/{area_a['id']}/photos",
+        files={"file": ("foto-a2.jpg", b"fake-image-a2", "image/jpeg")},
+        data={"hotspot_label": "A2"},
+    )
+    assert upload_a2.status_code == 201
+    assert upload_a2.json()["hotspot_label"] == "A2"
+
+    missing_hotspot = auth_client.post(
+        f"/api/areas/{area_a['id']}/photos",
+        files={"file": ("foto-sin-punto.jpg", b"sin-punto", "image/jpeg")},
+    )
+    assert missing_hotspot.status_code == 400
+    assert "punto del plano" in missing_hotspot.json()["detail"].lower()
+
+    area_page = auth_client.get("/areas/A")
+    assert "A1 — Acceso edificio principal" in area_page.text
+    assert "A2 — Pasillo frente a gradería" in area_page.text
+
+    filtered_page = auth_client.get("/areas/A?punto=A1")
+    assert filtered_page.status_code == 200
+    assert "A1 — Acceso edificio principal" in filtered_page.text
+    assert "fake-image-a1" not in filtered_page.text  # image url is /uploads/ not raw bytes
+    assert "Foto en acceso principal" in filtered_page.text
 
 
 def test_area_detail_page(auth_client):
@@ -228,7 +366,10 @@ def test_dashboard_shows_track_map(auth_client):
     assert "Resumen por marcador" in response.text
     assert "A1" in response.text
     assert "B1" in response.text
-    assert "L1" in response.text
+    assert "L1" not in response.text or "Peralte 1" in response.text
+    assert "Peralte 1" in response.text
+    assert "Peralte 2" in response.text
+    assert "Peralte 3" in response.text
     assert "Pista de BMX Carlos Ramírez" in response.text
     assert "/static/images/cancha.png" in response.text
     assert "/areas/A" in response.text
@@ -240,7 +381,10 @@ def test_map_calibration_page(auth_client):
     assert response.status_code == 200
     assert "Calibrar plano de la cancha" in response.text
     assert "A1" in response.text
-    assert "L1" in response.text
+    assert "L1" not in response.text or "Peralte 1" in response.text
+    assert "Peralte 1" in response.text
+    assert "Peralte 2" in response.text
+    assert "Peralte 3" in response.text
 
 
 def test_save_map_calibration(auth_client):

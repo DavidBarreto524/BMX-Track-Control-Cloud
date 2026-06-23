@@ -51,6 +51,7 @@ class Photo(Base):
     area_id: Mapped[int] = mapped_column(ForeignKey("areas.id"), nullable=False, index=True)
     image_url: Mapped[str] = mapped_column(String(500), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hotspot_label: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     area: Mapped["Area"] = relationship("Area", back_populates="photos")
