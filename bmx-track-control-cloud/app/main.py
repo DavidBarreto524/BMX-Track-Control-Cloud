@@ -41,6 +41,9 @@ from app.services.map_hotspots import (
     reset_map_hotspots_to_defaults,
 )
 from app.services.users import SESSION_USER_ID_KEY, authenticate_user, ensure_bootstrap_users
+from app.services.timezone import format_datetime as format_datetime_colombia
+from app.services.timezone import format_filename_timestamp
+from app.services.timezone import utc_now
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -48,9 +51,7 @@ templates.env.globals["has_permission"] = has_permission
 
 
 def _format_datetime(value: datetime | None) -> str:
-    if not value:
-        return ""
-    return value.strftime("%d/%m/%Y %H:%M")
+    return format_datetime_colombia(value)
 
 
 templates.env.filters["format_datetime"] = _format_datetime
@@ -64,7 +65,7 @@ uploads_dir.mkdir(parents=True, exist_ok=True)
 def _upload_status(last_uploaded_at: datetime | None, interval_minutes: int) -> str:
     if last_uploaded_at is None:
         return "Sin fotos"
-    diff_minutes = (datetime.utcnow() - last_uploaded_at).total_seconds() / 60
+    diff_minutes = (utc_now() - last_uploaded_at).total_seconds() / 60
     return "Al día" if diff_minutes <= interval_minutes else "Atrasada"
 
 
@@ -653,7 +654,7 @@ def generate_report_pdf(
         for path in temp_files:
             path.unlink(missing_ok=True)
 
-    filename = f"reporte-bmx-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.pdf"
+    filename = f"reporte-bmx-{format_filename_timestamp()}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

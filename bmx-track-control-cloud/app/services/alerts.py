@@ -1,13 +1,14 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
 from app.models import Alert, Area, Photo
+from app.services.timezone import utc_now
 
 
 def evaluate_upload_alerts(db: Session) -> int:
     areas = db.query(Area).all()
-    now = datetime.utcnow()
+    now = utc_now()
     created_alerts = 0
 
     for area in areas:

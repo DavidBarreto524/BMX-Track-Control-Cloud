@@ -19,7 +19,7 @@
           </span>
         </div>
         <p class="small mb-1"><strong>Intervalo:</strong> {{ area.expected_upload_interval_minutes }} min</p>
-        <p class="small mb-0"><strong>Última foto:</strong> {{ area.last_uploaded_at or "Sin registros" }}</p>
+        <p class="small mb-0"><strong>Última foto:</strong> {% if area.last_uploaded_at %}{{ area.last_uploaded_at|format_datetime }}{% else %}Sin registros{% endif %}</p>
 
         {% if has_permission(current_user.role, 'upload_photos') %}
         <hr>
@@ -52,7 +52,7 @@
                   <img src="{{ photo.image_url }}" alt="Foto área {{ area.code }}" loading="lazy">
                 </a>
                 <div class="photo-card-body">
-                  <div class="small text-muted">{{ photo.uploaded_at }}</div>
+                  <div class="small text-muted">{{ photo.uploaded_at|format_datetime }}</div>
                   {% if photo.notes %}
                     <p class="small mb-2">{{ photo.notes }}</p>
                   {% endif %}

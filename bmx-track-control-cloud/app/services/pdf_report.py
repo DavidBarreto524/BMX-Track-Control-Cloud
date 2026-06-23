@@ -16,6 +16,7 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Image as RLImage, Paragraph, SimpleDocTemplate, Spacer, PageBreak
 
 from app.config import settings
+from app.services.timezone import format_datetime, format_now_colombia
 
 
 @dataclass
@@ -115,7 +116,7 @@ def build_photos_pdf(
     story.append(Paragraph(title, title_style))
     story.append(
         Paragraph(
-            f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+            f"Generado: {format_now_colombia()} (hora Colombia)",
             meta_style,
         )
     )
@@ -131,7 +132,7 @@ def build_photos_pdf(
         if index > 0:
             story.append(PageBreak())
         area_text = entry.area_label.replace("&", "&amp;")
-        date_text = entry.uploaded_at.strftime("%d/%m/%Y %H:%M")
+        date_text = format_datetime(entry.uploaded_at)
         story.append(Paragraph(f"{area_text} — {date_text}", heading_style))
         notes = (entry.notes or "").strip()
         if notes:
