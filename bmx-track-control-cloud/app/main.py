@@ -39,7 +39,13 @@ from app.services.photo_locations import (
     resolve_hotspot_for_area,
 )
 from app.services.security import can_delete_photos, has_permission
-from app.services.storage import delete_stored_photo, store_photo
+from app.services.storage import (
+    count_ephemeral_photo_records,
+    delete_stored_photo,
+    log_storage_status_on_startup,
+    photo_storage_status,
+    store_photo,
+)
 from app.services.pdf_report import ReportPhotoEntry, build_photos_pdf, resolve_photo_image_path
 from app.services.photos import delete_all_photos
 from app.services.map_hotspots import (
@@ -140,11 +146,26 @@ def _page_context(
     current_user: User | None = None,
     **extra,
 ) -> dict:
+    storage = photo_storage_status()
+    storage_warning = None
+    ephemeral_photos_warning = None
+    if current_user and has_permission(current_user.role, "upload_photos"):
+        storage_warning = storage.get("warning")
+        if storage.get("production") and storage.get("cloudinary_configured"):
+            ephemeral_count = count_ephemeral_photo_records(db)
+            if ephemeral_count > 0:
+                ephemeral_photos_warning = (
+                    f"Hay {ephemeral_count} foto(s) guardadas en disco local que ya no están "
+                    "disponibles en el servidor. Vuelve a subirlas o usa «Reiniciar todas las fotos»."
+                )
+
     context = {
         "request": request,
         "app_name": settings.app_name,
         "current_user": current_user,
         "open_alerts": _fetch_open_alerts(db, current_user),
+        "storage_warning": storage_warning,
+        "ephemeral_photos_warning": ephemeral_photos_warning,
     }
     context.update(extra)
     return context
@@ -164,6 +185,8 @@ async def lifespan(_: FastAPI):
         ensure_map_hotspots(db)
     finally:
         db.close()
+
+    log_storage_status_on_startup()
 
     if settings.enable_scheduler and not scheduler.running:
         scheduler.add_job(
@@ -769,5 +792,13 @@ def update_photo_notes(
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok", "service": settings.app_name}
+def health_check(db: Session = Depends(get_db)):
+    storage = photo_storage_status()
+    local_photos = count_ephemeral_photo_records(db)
+    overall_status = "ok" if storage["persistent_storage"] else "degraded"
+    return {
+        "status": overall_status,
+        "service": settings.app_name,
+        "photo_storage": storage,
+        "local_photos_in_db": local_photos,
+    }

@@ -1,3 +1,4 @@
+import logging
 import re
 from pathlib import Path
 from uuid import uuid4
@@ -5,17 +6,52 @@ from uuid import uuid4
 import cloudinary
 import cloudinary.uploader
 from fastapi import UploadFile
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models import Photo
 
+logger = logging.getLogger(__name__)
 _cloudinary_configured = False
 
 
-def _cloudinary_enabled() -> bool:
+def is_production_deployment() -> bool:
+    database_url = settings.database_url.lower()
+    return "postgresql" in database_url or database_url.startswith("postgres:")
+
+
+def cloudinary_enabled() -> bool:
     return bool(
         settings.cloudinary_cloud_name
         and settings.cloudinary_api_key
         and settings.cloudinary_api_secret
+    )
+
+
+def photo_storage_status() -> dict[str, str | bool | None]:
+    production = is_production_deployment()
+    cloudinary = cloudinary_enabled()
+    persistent = (not production) or cloudinary
+    warning = None
+    if production and not cloudinary:
+        warning = (
+            "Almacenamiento temporal: configura Cloudinary en Render "
+            "(CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET). "
+            "Sin eso las fotos se pierden al reiniciar el servidor."
+        )
+    return {
+        "production": production,
+        "cloudinary_configured": cloudinary,
+        "persistent_storage": persistent,
+        "warning": warning,
+    }
+
+
+def count_ephemeral_photo_records(db: Session) -> int:
+    return (
+        db.query(Photo)
+        .filter(Photo.image_url.like("/uploads/%"))
+        .count()
     )
 
 
@@ -32,7 +68,18 @@ def _configure_cloudinary() -> None:
     _cloudinary_configured = True
 
 
+def _ensure_upload_storage_ready() -> None:
+    if is_production_deployment() and not cloudinary_enabled():
+        raise ValueError(
+            "En producción las fotos deben guardarse en Cloudinary. "
+            "Configura CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y "
+            "CLOUDINARY_API_SECRET en las variables de entorno de Render."
+        )
+
+
 async def store_photo(file: UploadFile) -> str:
+    _ensure_upload_storage_ready()
+
     payload = await file.read()
     if not payload:
         raise ValueError("El archivo de imagen está vacío.")
@@ -40,7 +87,7 @@ async def store_photo(file: UploadFile) -> str:
     suffix = Path(file.filename or "foto.jpg").suffix or ".jpg"
     safe_name = f"bmx_{uuid4().hex}{suffix}"
 
-    if _cloudinary_enabled():
+    if cloudinary_enabled():
         _configure_cloudinary()
         upload_kwargs = {
             "public_id": f"bmx-track-control/{Path(safe_name).stem}",
@@ -81,7 +128,14 @@ def delete_stored_photo(image_url: str) -> None:
         return
 
     public_id = _cloudinary_public_id(image_url)
-    if public_id and _cloudinary_enabled():
+    if public_id and cloudinary_enabled():
         _configure_cloudinary()
         cloudinary.uploader.destroy(public_id, resource_type="image")
 
+
+def log_storage_status_on_startup() -> None:
+    status = photo_storage_status()
+    if status["warning"]:
+        logger.warning(str(status["warning"]))
+    elif status["production"] and status["cloudinary_configured"]:
+        logger.info("Almacenamiento de fotos: Cloudinary activo en producción.")

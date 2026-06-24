@@ -16,6 +16,18 @@
   </head>
   <body class="bg-light">
     <div class="container app-container py-3 py-md-4">
+      {% if storage_warning %}
+        <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+          <strong>Configuración pendiente:</strong> {{ storage_warning }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+      {% endif %}
+      {% if ephemeral_photos_warning %}
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+          <strong>Fotos no disponibles:</strong> {{ ephemeral_photos_warning }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+      {% endif %}
       {% block header %}
       <header class="app-header mb-3 mb-md-4 d-flex justify-content-between gap-2 gap-md-3 flex-wrap align-items-center">
         <div class="app-brand">

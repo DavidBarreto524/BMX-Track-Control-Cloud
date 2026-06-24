@@ -189,9 +189,12 @@ Con esto la app no se duerme y el scheduler de alertas sigue funcionando.
 - Verifica que `DATABASE_URL` en Render sea la de Neon (con `?sslmode=require`).
 - Revisa los logs en Render → **Logs**.
 
-### Las fotos no se guardan
-- Configura las tres variables `CLOUDINARY_*` en Render.
-- Redeploy después de agregarlas.
+### Las fotos no se guardan o aparecen `{"detail":"Not Found"}`
+- **Causa:** En Render el disco es temporal. Si las fotos se guardaron como `/uploads/...` (sin Cloudinary), se borran al reiniciar o desplegar.
+- **Solución:** Configura las tres variables `CLOUDINARY_*` en Render y haz **Redeploy**.
+- Verifica en `https://TU-APP.onrender.com/health` que `photo_storage.persistent_storage` sea `true`.
+- Las fotos viejas con `/uploads/` en la base de datos **no se recuperan**; hay que subirlas de nuevo o usar «Reiniciar todas las fotos».
+- La app muestra un aviso amarillo en el panel si falta Cloudinary en producción.
 
 ### La app tarda ~1 minuto en cargar
 - El plan gratis “despertó” tras inactividad. Configura cron-job.org (paso 6).
