@@ -11,6 +11,10 @@ os.environ["LOCAL_UPLOAD_DIR"] = "tests/uploads"
 os.environ["ADMIN_USERNAME"] = "admin"
 os.environ["ADMIN_PASSWORD"] = "admin123"
 os.environ["SESSION_SECRET_KEY"] = "test-secret-key"
+os.environ["CLOUDINARY_CLOUD_NAME"] = ""
+os.environ["CLOUDINARY_API_KEY"] = ""
+os.environ["CLOUDINARY_API_SECRET"] = ""
+os.environ["CLOUDINARY_UPLOAD_PRESET"] = ""
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))

@@ -5,9 +5,7 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from urllib.parse import urlparse
 
-import httpx
 from PIL import Image as PILImage
 from PIL import ImageOps
 from reportlab.lib import colors
@@ -16,7 +14,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Image as RLImage, PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
-from app.config import settings
+from app.services.storage import download_image_for_report
 from app.services.timezone import format_datetime, format_now_colombia
 
 PHOTOS_PER_PAGE = 2
@@ -33,31 +31,8 @@ class ReportPhotoEntry:
     image_path: Path
 
 
-def _resolve_local_image_path(image_url: str) -> Path | None:
-    if not image_url.startswith("/uploads/"):
-        return None
-    filename = image_url.removeprefix("/uploads/").lstrip("/")
-    path = Path(settings.local_upload_dir) / filename
-    return path if path.is_file() else None
-
-
-def _download_remote_image(image_url: str) -> Path:
-    suffix = Path(urlparse(image_url).path).suffix or ".jpg"
-    with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-        response = client.get(image_url)
-        response.raise_for_status()
-        with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(response.content)
-            return Path(tmp.name)
-
-
 def resolve_photo_image_path(image_url: str) -> Path:
-    local_path = _resolve_local_image_path(image_url)
-    if local_path:
-        return local_path
-    if image_url.startswith("http://") or image_url.startswith("https://"):
-        return _download_remote_image(image_url)
-    raise ValueError(f"No se pudo cargar la imagen: {image_url}")
+    return download_image_for_report(image_url)
 
 
 def _prepare_image_for_pdf(image_path: Path, temp_files: list[Path]) -> tuple[Path, int, int]:

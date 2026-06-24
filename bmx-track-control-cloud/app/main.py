@@ -42,11 +42,12 @@ from app.services.security import can_delete_photos, has_permission
 from app.services.storage import (
     count_ephemeral_photo_records,
     delete_stored_photo,
+    download_image_for_report,
     log_storage_status_on_startup,
     photo_storage_status,
     store_photo,
 )
-from app.services.pdf_report import ReportPhotoEntry, build_photos_pdf, resolve_photo_image_path
+from app.services.pdf_report import ReportPhotoEntry, build_photos_pdf
 from app.services.photos import delete_all_photos
 from app.services.map_hotspots import (
     TRACK_MAP_IMAGE,
@@ -742,8 +743,10 @@ def generate_report_pdf(
         for item in payload.photos:
             photo = photos_by_id[item.photo_id]
             try:
-                image_path = resolve_photo_image_path(photo.image_url)
-            except (ValueError, OSError) as exc:
+                image_path = download_image_for_report(photo.image_url)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except OSError as exc:
                 raise HTTPException(
                     status_code=400,
                     detail=f"No se pudo cargar la imagen de la foto #{photo.id}.",
