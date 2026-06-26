@@ -55,6 +55,20 @@
     messageEl.className = `small mt-2 ${isError ? "text-danger" : "text-success"}`;
   }
 
+  function filenameFromContentDisposition(header) {
+    if (!header) return null;
+    const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match) {
+      try {
+        return decodeURIComponent(utf8Match[1]);
+      } catch (_error) {
+        return utf8Match[1];
+      }
+    }
+    const asciiMatch = header.match(/filename="([^"]+)"/i);
+    return asciiMatch ? asciiMatch[1] : null;
+  }
+
   generateBtn.addEventListener("click", async () => {
     const photos = getSelectedItems();
     if (!photos.length) {
@@ -84,9 +98,10 @@
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
       link.href = url;
-      link.download = `reporte-bmx-${stamp}.pdf`;
+      link.download = filenameFromContentDisposition(
+        response.headers.get("Content-Disposition"),
+      ) || "reporte.pdf";
       document.body.appendChild(link);
       link.click();
       link.remove();

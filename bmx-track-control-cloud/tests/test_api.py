@@ -458,6 +458,7 @@ def test_generate_report_pdf(auth_client):
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert response.content.startswith(b"%PDF")
+    assert 'filename="Reporte de prueba.pdf"' in response.headers["content-disposition"]
 
     updated = auth_client.get(f"/api/areas/{area['id']}/photos").json()
     assert updated[0]["notes"] == "Comentario editado"

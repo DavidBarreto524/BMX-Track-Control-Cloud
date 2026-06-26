@@ -47,7 +47,7 @@ from app.services.storage import (
     photo_storage_status,
     store_photo,
 )
-from app.services.pdf_report import ReportPhotoEntry, build_photos_pdf
+from app.services.pdf_report import ReportPhotoEntry, build_photos_pdf, report_pdf_content_disposition
 from app.services.photos import delete_all_photos
 from app.services.map_hotspots import (
     TRACK_MAP_IMAGE,
@@ -60,7 +60,6 @@ from app.services.map_hotspots import (
 )
 from app.services.users import SESSION_USER_ID_KEY, authenticate_user, ensure_bootstrap_users
 from app.services.timezone import format_datetime as format_datetime_colombia
-from app.services.timezone import format_filename_timestamp
 from app.services.timezone import utc_now
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -772,11 +771,10 @@ def generate_report_pdf(
         for path in temp_files:
             path.unlink(missing_ok=True)
 
-    filename = f"reporte-bmx-{format_filename_timestamp()}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": report_pdf_content_disposition(payload.title)},
     )
 
 

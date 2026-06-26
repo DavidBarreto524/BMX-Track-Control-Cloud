@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from urllib.parse import quote
 
 from PIL import Image as PILImage
 from PIL import ImageOps
@@ -21,6 +24,31 @@ PHOTOS_PER_PAGE = 2
 HEADER_FIRST_PAGE_HEIGHT = 3.2 * cm
 CAPTION_BLOCK_HEIGHT = 2.0 * cm
 PHOTO_ROW_GAP = 0.35 * cm
+_INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_DEFAULT_REPORT_TITLE = "Reporte de fotos BMX"
+
+
+def report_pdf_filename(title: str) -> str:
+    cleaned = (title or "").strip() or _DEFAULT_REPORT_TITLE
+    normalized = unicodedata.normalize("NFKC", cleaned)
+    safe = _INVALID_FILENAME_CHARS.sub("", normalized)
+    safe = re.sub(r"\s+", " ", safe).strip().rstrip(". ")
+    if len(safe) > 120:
+        safe = safe[:120].rstrip(". ")
+    if not safe:
+        safe = _DEFAULT_REPORT_TITLE
+    if not safe.lower().endswith(".pdf"):
+        safe = f"{safe}.pdf"
+    return safe
+
+
+def report_pdf_content_disposition(title: str) -> str:
+    filename = report_pdf_filename(title)
+    ascii_fallback = filename.encode("ascii", "ignore").decode().strip() or "reporte.pdf"
+    if filename == ascii_fallback:
+        return f'attachment; filename="{ascii_fallback}"'
+    encoded = quote(filename, safe="")
+    return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
 @dataclass
