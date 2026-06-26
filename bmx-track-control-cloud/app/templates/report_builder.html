@@ -71,9 +71,9 @@
             <label class="form-label small mb-1" for="photo-notes-{{ photo.id }}">Comentario</label>
             <textarea
               id="photo-notes-{{ photo.id }}"
-              class="form-control form-control-sm report-photo-notes"
+              class="form-control form-control-sm report-photo-notes speech-dictation-field"
               rows="3"
-              placeholder="Comentario para el reporte..."
+              placeholder="Comentario para el reporte…"
             >{{ photo.notes or '' }}</textarea>
           </div>
         </article>
@@ -90,5 +90,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/speech-dictation.js"></script>
 <script src="/static/js/report-builder.js"></script>
 {% endblock %}

@@ -643,3 +643,29 @@ a.track-hotspot:focus-visible {
   border-color: #58a6ff;
   box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.35);
 }
+
+.speech-dictation-group .speech-dictation-btn {
+  flex-shrink: 0;
+}
+
+.speech-dictation-group textarea.speech-dictation-field {
+  min-height: 2.75rem;
+  resize: vertical;
+}
+
+.speech-dictation-btn.listening {
+  color: #fff;
+  background-color: #dc3545;
+  border-color: #dc3545;
+  animation: speech-dictation-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes speech-dictation-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 0.35rem rgba(220, 53, 69, 0.15);
+  }
+}

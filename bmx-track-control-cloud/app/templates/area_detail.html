@@ -134,7 +134,15 @@
 
           <div class="col-12">
 
-            <input name="notes" class="form-control" placeholder="Nota opcional">
+            <label class="form-label small mb-1" for="photo-notes-input">Nota (opcional)</label>
+
+            <input
+              name="notes"
+              id="photo-notes-input"
+              class="form-control speech-dictation-field"
+              placeholder="Escribe o dicta una nota…"
+              autocomplete="off"
+            >
 
           </div>
 
@@ -264,4 +272,7 @@
 
 {% endblock %}
 
+{% block scripts %}
+<script src="/static/js/speech-dictation.js"></script>
+{% endblock %}
 
